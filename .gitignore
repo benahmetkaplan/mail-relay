@@ -3,4 +3,3 @@
 /.env
 /storage/*.log
 /storage/*.json
-/config.local.php

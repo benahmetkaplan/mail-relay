@@ -14,15 +14,34 @@ final class RateLimiter
     private int $windowSeconds;
     private int $maxRequests;
 
-    public function __construct(string $storageDir, int $maxRequests = 60, int $windowSeconds = 60)
-    {
+    /** @var (callable(string): void)|null */
+    private $logger;
+
+    /**
+     * @param (callable(string): void)|null $logger Invoked with a short message when
+     *        the storage file cannot be opened or locked. Pass null to log nothing.
+     */
+    public function __construct(
+        string $storageDir,
+        int $maxRequests = 60,
+        int $windowSeconds = 60,
+        ?callable $logger = null
+    ) {
         $this->file = rtrim($storageDir, '/\\') . '/ratelimit.json';
         $this->maxRequests = $maxRequests;
         $this->windowSeconds = $windowSeconds;
+        $this->logger = $logger;
     }
 
     /**
      * Returns true if the request is allowed, false if rate limit exceeded.
+     *
+     * Fails OPEN: if the storage file can't be opened or locked, the request
+     * is allowed rather than rejected. This is deliberate — a storage/filesystem
+     * problem should not take down mail delivery — but it does mean rate
+     * limiting is silently disabled while the underlying problem persists.
+     * Both failure cases are logged (never surfaced to the HTTP caller) so
+     * operators can notice and fix them.
      */
     public function allow(string $identifier): bool
     {
@@ -33,12 +52,13 @@ final class RateLimiter
 
         $fp = @fopen($this->file, 'c+');
         if ($fp === false) {
-            // Fail open if storage isn't writable — availability over strict limiting.
+            $this->log('Rate limiter: failed to open storage file, failing open');
             return true;
         }
 
         try {
             if (!flock($fp, LOCK_EX)) {
+                $this->log('Rate limiter: failed to lock storage file, failing open');
                 return true;
             }
 
@@ -79,6 +99,13 @@ final class RateLimiter
         } finally {
             flock($fp, LOCK_UN);
             fclose($fp);
+        }
+    }
+
+    private function log(string $message): void
+    {
+        if ($this->logger !== null) {
+            ($this->logger)($message);
         }
     }
 }

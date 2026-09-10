@@ -24,6 +24,8 @@ final class MailRelay
     private const MAX_BODY_BYTES = 200 * 1024; // 200 KB — generous for transactional email HTML.
     private const ALLOWED_EXTRA_HEADERS = ['In-Reply-To', 'References'];
     private const SMTP_TIMEOUT_SECONDS = 15;
+    private const DEFAULT_RATE_LIMIT_MAX = 60;
+    private const DEFAULT_RATE_LIMIT_WINDOW = 60;
 
     public function __construct(
         private readonly string $storageDir
@@ -107,10 +109,28 @@ final class MailRelay
     private function enforceRateLimit(): void
     {
         $identifier = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $limiter = new RateLimiter($this->storageDir, maxRequests: 60, windowSeconds: 60);
+        $limiter = new RateLimiter(
+            $this->storageDir,
+            maxRequests: $this->positiveIntConfig('RATE_LIMIT_MAX', self::DEFAULT_RATE_LIMIT_MAX),
+            windowSeconds: $this->positiveIntConfig('RATE_LIMIT_WINDOW', self::DEFAULT_RATE_LIMIT_WINDOW),
+            logger: fn (string $message) => $this->logError($message)
+        );
         if (!$limiter->allow($identifier)) {
             throw new HttpError(429, 'Too Many Requests');
         }
+    }
+
+    /**
+     * Reads a positive-integer config value, falling back to $default if the
+     * value is missing or not a positive integer (e.g. blank, negative, non-numeric).
+     */
+    private function positiveIntConfig(string $key, int $default): int
+    {
+        $raw = Config::get($key);
+        if ($raw === null || $raw === '' || !ctype_digit($raw) || (int) $raw < 1) {
+            return $default;
+        }
+        return (int) $raw;
     }
 
     private function parseBody(): array
@@ -224,7 +244,12 @@ final class MailRelay
             $mail->Username = Config::require('SMTP_USER');
             $mail->Password = Config::require('SMTP_PASSWORD');
 
-            // SMTP_SECURE=false with port 587 still requires STARTTLS.
+            // SMTP_SECURE selects the PHPMailer encryption mode — it does NOT toggle
+            // encryption on/off; STARTTLS is still a fully encrypted connection.
+            //   SMTP_SECURE=false (default) -> ENCRYPTION_STARTTLS (typically port 587):
+            //       connect in plaintext, then upgrade to TLS via the STARTTLS command.
+            //   SMTP_SECURE=true            -> ENCRYPTION_SMTPS (typically port 465):
+            //       implicit TLS from the first byte of the connection.
             $smtpSecure = Config::get('SMTP_SECURE', 'false');
             if (filter_var($smtpSecure, FILTER_VALIDATE_BOOLEAN)) {
                 $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;

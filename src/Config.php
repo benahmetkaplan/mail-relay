@@ -78,6 +78,8 @@ final class Config
             'FROM_EMAIL',
             'FROM_NAME',
             'MAIL_RELAY_SECRET',
+            'RATE_LIMIT_MAX',
+            'RATE_LIMIT_WINDOW',
         ];
     }
 }

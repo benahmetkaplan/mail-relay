@@ -1,4 +1,7 @@
 {
+    "name": "benahmetkaplan/mail-relay",
+    "description": "A lightweight PHP mail relay for sending emails through an SMTP server via a simple HTTP API.",
+    "license": "MIT",
     "require": {
         "php": ">=8.1",
         "phpmailer/phpmailer": "^7.1",

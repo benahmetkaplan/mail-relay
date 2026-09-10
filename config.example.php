@@ -7,13 +7,17 @@
  * 2. Fill in real values.
  * 3. NEVER commit config.local.php — it is already listed in .gitignore.
  *
- * Real environment variables (getenv), if present, always take priority
- * over this file — see src/Config.php.
+ * Precedence (see src/Config.php): real environment variables win first
+ * (a project-root .env file is loaded to fill in any that aren't already
+ * set), and this file is used only for keys still missing after that.
  */
 
 return [
     'SMTP_HOST' => 'smtp.example.com',
     'SMTP_PORT' => '587',
+    // SMTP_SECURE selects the PHPMailer encryption mode, not "encrypted vs plaintext":
+    //   'false' (default) -> STARTTLS (implicit-upgrade TLS, typically port 587)
+    //   'true'             -> SMTPS   (implicit TLS from connect, typically port 465)
     'SMTP_SECURE' => 'false',
     'SMTP_USER' => 'noreply@example.com',
     'SMTP_PASSWORD' => 'your-smtp-password',
@@ -22,4 +26,8 @@ return [
     'FROM_NAME' => 'Your App',
 
     'MAIL_RELAY_SECRET' => 'your-long-random-secret',
+
+    // Rate limiting (optional — defaults shown; must be positive integers).
+    'RATE_LIMIT_MAX' => '60',
+    'RATE_LIMIT_WINDOW' => '60',
 ];
