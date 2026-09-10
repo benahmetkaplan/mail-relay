@@ -1,0 +1,12 @@
+{
+    "require": {
+        "php": ">=8.1",
+        "phpmailer/phpmailer": "^7.1",
+        "vlucas/phpdotenv": "^5.7"
+    },
+    "autoload": {
+        "psr-4": {
+            "MailRelay\\": "src/"
+        }
+    }
+}

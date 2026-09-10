@@ -1,0 +1,6 @@
+/vendor/
+/config.local.php
+/.env
+/storage/*.log
+/storage/*.json
+/config.local.php
